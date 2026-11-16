@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -241,8 +240,15 @@
             cursor: pointer;
             transition: 0.2s;
         }
+        
+        .player-card.empty-seat {
+            background: rgba(15, 23, 42, 0.5);
+            border-style: dashed;
+            cursor: default;
+            color: #64748b;
+        }
 
-        .player-card:hover:not(.dead) {
+        .player-card:hover:not(.dead):not(.empty-seat) {
             border-color: #38bdf8;
             transform: translateY(-2px);
         }
@@ -299,6 +305,24 @@
             border-radius: 12px;
             padding: 14px;
             text-align: center;
+        }
+        
+        #host-controls { 
+            background: #334155; 
+            padding: 10px; 
+            border: 1px solid #475569; 
+            border-radius: 8px; 
+            margin-bottom: 10px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #host-controls select {
+            width: auto;
+            display: inline-block;
+            padding: 6px 12px;
         }
 
         #phase-timer-box {
@@ -435,6 +459,20 @@
                 <span class="volume-percent" id="volume-percent">60%</span>
             </div>
         </div>
+        
+        <div id="host-controls">
+            <strong>👑 Quyền Chủ Phòng:</strong>
+            <label>Chỉnh số người:</label>
+            <select id="lobby-max-players-select">
+                <option value="5">5 Người</option>
+                <option value="8">8 Người</option>
+                <option value="11">11 Người</option>
+                <option value="13">13 Người</option>
+                <option value="15">15 Người</option>
+                <option value="19">19 Người</option>
+            </select>
+            <button class="btn btn-success" style="padding: 6px 12px; font-size: 14px;" onclick="changeMaxPlayers()">Cập nhật</button>
+        </div>
 
         <div class="players-grid" id="players-grid"></div>
 
@@ -549,8 +587,8 @@
         let isHost = false, roomCode = "", myId = "", myName = "", lastRenderedPhase = "";
         let hasJoinedLobby = false;
         let phaseInterval = null;
-        let isResolvingPhase = false; // Khóa chống chạy lặp pha
-        let renderedChatKeys = new Set(); // Khóa chống in trùng tin nhắn
+        let isResolvingPhase = false; 
+        let renderedChatKeys = new Set(); 
         let selectedTargets = [];
         let state = { maxPlayers: 8, phase: 'LOBBY', dayCount: 1, players: [], lastGuardedId: null, hunterId: null, lovers: [], phaseTimer: 30 };
 
@@ -621,6 +659,22 @@
             if (isHost) db.ref('rooms/' + roomCode + '/privateChat/' + playerId).push({ text, logType });
         }
 
+        function changeMaxPlayers() {
+            if (!isHost) return;
+            const newMax = parseInt(document.getElementById('lobby-max-players-select').value);
+            const currentPlayersCount = state.players ? state.players.length : 0;
+            
+            if (currentPlayersCount > newMax) {
+                alert(`Không thể giảm! Phòng đang có ${currentPlayersCount} người. Cần kích bớt người chơi trước khi giảm xuống ${newMax}.`);
+                document.getElementById('lobby-max-players-select').value = state.maxPlayers;
+                return;
+            }
+            
+            state.maxPlayers = newMax;
+            broadcastLog(`⚙️ Chủ phòng đã thay đổi giới hạn phòng thành ${newMax} người.`, 'system');
+            broadcastState();
+        }
+
         // ================= TÍNH NĂNG KÍCH THÀNH VIÊN =================
         function kickPlayer(event, targetId) {
             event.stopPropagation();
@@ -685,7 +739,6 @@
                 addLogUI(data.text, data.logType);
             });
             db.ref('rooms/' + roomCode + '/chat').on('child_removed', () => {
-                // Xóa khung chat trên mọi máy khi chủ phòng bắt đầu ván mới
                 if (document.getElementById('chat-box').children.length > 0 && state.dayCount === 1 && state.phase === 'NIGHT') {
                     renderedChatKeys.clear();
                     document.getElementById('chat-box').innerHTML = '';
@@ -720,6 +773,36 @@
             broadcastLog(`🤖 Đã tự động điền máy AI cho đủ người.`, 'system'); broadcastState();
         }
 
+        function returnToLobby() {
+            if (!isHost) return;
+            clearInterval(phaseInterval);
+            isResolvingPhase = false;
+            
+            // Xóa chat cũ khi trở về sảnh chờ thay vì lúc vào game
+            renderedChatKeys.clear();
+            document.getElementById('chat-box').innerHTML = '';
+            db.ref('rooms/' + roomCode + '/chat').remove();
+
+            state.phase = 'LOBBY';
+            state.dayCount = 1;
+            state.lastGuardedId = null;
+            state.hunterId = null;
+            state.lovers = [];
+            
+            // Reset trạng thái người chơi, giữ lại danh sách và avatar
+            state.players.forEach(p => {
+                p.role = null;
+                p.alive = true;
+                p.votes = 0;
+                p.nightTarget = null;
+                p.nightActionDone = false;
+                p.voted = false;
+            });
+            
+            broadcastLog(`🏠 Chủ phòng đã đưa mọi người trở về Sảnh Chờ!`, 'system');
+            broadcastState();
+        }
+
         function generateRoles(count) {
             const roles = [];
             let wolfCount = 1;
@@ -745,9 +828,6 @@
 
             clearInterval(phaseInterval);
             isResolvingPhase = false;
-            renderedChatKeys.clear();
-            document.getElementById('chat-box').innerHTML = '';
-            db.ref('rooms/' + roomCode + '/chat').remove();
 
             const roles = generateRoles(state.players.length);
             state.dayCount = 1; state.lastGuardedId = null; state.lovers = [];
@@ -879,7 +959,6 @@
         }
 
         function resolveNight() {
-            // KHÓA CHỐNG LẶP TUYỆT ĐỐI
             if (!isHost || state.phase !== 'NIGHT' || isResolvingPhase) return;
             isResolvingPhase = true;
             clearInterval(phaseInterval);
@@ -926,7 +1005,6 @@
                     triggerHunter(hunterNeedsToShoot);
                 } else if (!checkWinCondition()) {
                     simulateAIChat();
-                    // Tự động chuyển sang 15s Vote sau 2 giây công bố kết quả đêm
                     setTimeout(startVotePhase, 2000);
                 }
             }, 1500);
@@ -1140,8 +1218,15 @@
                 'RESOLVING_VOTE': `⚖️ ĐANG TỔNG KẾT PHIẾU`, 'HUNTER_SHOT': `🏹 THỢ SĂN BẮN KÉO THEO`, 'GAMEOVER': `🏁 KẾT THÚC VÁN`
             };
             document.getElementById('phase-display').innerText = phaseNames[state.phase] || state.phase;
+            
+            const hostControls = document.getElementById('host-controls');
+            if (isHost && state.phase === 'LOBBY') {
+                hostControls.style.display = 'flex';
+                document.getElementById('lobby-max-players-select').value = state.maxPlayers;
+            } else {
+                hostControls.style.display = 'none';
+            }
 
-            // Đồng hồ đếm ngược chung cho 30s Ban Đêm & 15s Bỏ Phiếu
             const timerBox = document.getElementById('phase-timer-box');
             const timerLabel = document.getElementById('timer-label');
             const timerText = document.getElementById('phase-timer');
@@ -1158,6 +1243,7 @@
             }
 
             const grid = document.getElementById('players-grid'); grid.innerHTML = '';
+            
             state.players.forEach(p => {
                 const isMe = p.id === myId;
                 const showRole = (state.phase === 'GAMEOVER') || !p.alive || isMe || (me.role?.id === 'WOLF' && p.role?.id === 'WOLF');
@@ -1192,6 +1278,18 @@
                 }
                 grid.appendChild(card);
             });
+            
+            const emptySeats = state.maxPlayers - state.players.length;
+            for (let i = 0; i < emptySeats; i++) {
+                const emptyCard = document.createElement('div');
+                emptyCard.className = 'player-card empty-seat';
+                emptyCard.innerHTML = `
+                    <div class="avatar">🪑</div>
+                    <div class="p-name">Ghế trống</div>
+                    <div class="p-status">Đang chờ người vào...</div>
+                `;
+                grid.appendChild(emptyCard);
+            }
 
             const promptEl = document.getElementById('action-prompt');
             const btnsEl = document.getElementById('action-buttons'); btnsEl.innerHTML = '';
@@ -1229,10 +1327,9 @@
                 } else promptEl.innerText = "🏹 Thợ Săn đang nhắm bắn...";
             } else if (state.phase === 'GAMEOVER') {
                 promptEl.innerText = "🏁 Ván chơi kết thúc!";
-                if (isHost) btnsEl.innerHTML = `<button class="btn btn-success" onclick="startGame()">🔄 Chơi ván mới</button>`;
+                if (isHost) btnsEl.innerHTML = `<button class="btn btn-success" onclick="returnToLobby()">🔙 Về Sảnh Chờ</button>`;
             }
         }
     </script>
 </body>
-
 </html>
