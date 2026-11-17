@@ -662,22 +662,14 @@
                 broadcastLog(`👑 Bạn đã tạo phòng <b>${roomCode}</b> (${state.maxPlayers} người). Hãy gửi mã cho bạn bè!`, 'system');
                 setupHostListeners();
                 
-                // Cập nhật onDisconnect để tự chết khi thoát
-                roomRef.child('players').on('value', snap => {
-                    if(snap.exists()) {
-                        let players = snap.val();
-                        let myIndex = players.findIndex(p => p.id === myId);
-                        if (myIndex !== -1) {
-                            roomRef.child('players/' + myIndex + '/alive').onDisconnect().set(false);
-                            // Thông báo tự động chết khi mất kết nối
-                            const disconnectMsg = `🔌 <b>${myName}</b> đã ngắt kết nối và tự vẫn!`;
-                            roomRef.child('disconnectLogs').onDisconnect().set({
-                                msg: disconnectMsg,
-                                time: firebase.database.ServerValue.TIMESTAMP
-                            });
-                        }
-                    }
-                });
+                // Đăng ký báo tử khi rớt mạng
+                const discRef = db.ref('rooms/' + roomCode + '/playerDisconnects/' + myId);
+                discRef.onDisconnect().set({ name: myName });
+                
+                // Đăng ký trạng thái Host để báo cho Client biết nếu Host thoát
+                const hostRef = db.ref('rooms/' + roomCode + '/hostStatus');
+                hostRef.set(true);
+                hostRef.onDisconnect().remove();
                 
             });
         }
@@ -703,22 +695,9 @@
                 db.ref('rooms/' + roomCode + '/joinRequests').push({ id: myId, name: myName });
                 enterGameScreen();
                 
-                // Thiết lập ngắt kết nối cho người tham gia
-                const roomRef = db.ref('rooms/' + roomCode);
-                roomRef.child('state/players').on('value', playersSnap => {
-                    if(playersSnap.exists()) {
-                        let players = playersSnap.val();
-                        let myIndex = players.findIndex(p => p.id === myId);
-                        if (myIndex !== -1) {
-                            roomRef.child('state/players/' + myIndex + '/alive').onDisconnect().set(false);
-                            const disconnectMsg = `🔌 <b>${myName}</b> đã ngắt kết nối và tự vẫn!`;
-                            roomRef.child('disconnectLogs').onDisconnect().set({
-                                msg: disconnectMsg,
-                                time: firebase.database.ServerValue.TIMESTAMP
-                            });
-                        }
-                    }
-                });
+                // Đăng ký báo tử khi rớt mạng
+                const discRef = db.ref('rooms/' + roomCode + '/playerDisconnects/' + myId);
+                discRef.onDisconnect().set({ name: myName });
             });
         }
 
@@ -787,28 +766,38 @@
                 const data = snap.val(); processHunterShot(data.playerId, data.targetId); snap.ref.remove();
             });
             
-            // Xử lý khi có ai đó ngắt kết nối
-            db.ref('rooms/' + roomCode + '/disconnectLogs').on('value', snap => {
-                if(snap.exists()) {
-                    let data = snap.val();
-                    broadcastLog(data.msg, 'death');
-                    
-                    // Xóa log để lần sau còn trigger
-                    db.ref('rooms/' + roomCode + '/disconnectLogs').remove();
-                    
-                    // Kiểm tra win condition nếu có người chết
-                    if(state.phase !== 'LOBBY' && state.phase !== 'GAMEOVER') {
-                         setTimeout(() => {
-                            if (checkWinCondition()) {
-                                // Game kết thúc thì các logic khác sẽ được clear
+            // Lắng nghe người chơi rớt mạng để cho chết thật sự
+            db.ref('rooms/' + roomCode + '/playerDisconnects').on('child_added', snap => {
+                const playerId = snap.key;
+                const p = state.players.find(x => x.id === playerId);
+                if (p) {
+                    if (state.phase === 'LOBBY') {
+                        state.players = state.players.filter(x => x.id !== playerId);
+                        broadcastLog(`🚪 <b>${p.name}</b> đã rời phòng.`, 'system');
+                        broadcastState();
+                    } else if (p.alive) {
+                        killPlayerAndCheckLover(playerId, `🔌 <b>${p.name}</b> đã ngắt kết nối và tự vẫn!`);
+                        if (!checkWinCondition()) {
+                            broadcastState();
+                            if (state.phase === 'NIGHT') checkAllNightActionsDone();
+                            else if (state.phase === 'DAY_VOTE' && !state.players.some(x => x.alive && !x.isAI && !x.voted)) {
+                                clearInterval(phaseInterval);
+                                finalizeAIVotesAndResolve();
                             }
-                         }, 1000);
+                        }
                     }
                 }
+                snap.ref.remove();
             });
         }
 
         function setupClientListeners() {
+                        db.ref('rooms/' + roomCode + '/hostStatus').on('value', snap => {
+                if (hasJoinedLobby && !isHost && !snap.exists()) {
+                    alert("🔌 Chủ phòng đã ngắt kết nối! Trò chơi kết thúc.");
+                    location.reload();
+                }
+            });
             db.ref('rooms/' + roomCode + '/state').on('value', snap => {
                 if (snap.exists()) {
                     state = snap.val();
