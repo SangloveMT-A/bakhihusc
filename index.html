@@ -33,10 +33,38 @@
 
         .container {
             width: 100%;
-            max-width: 940px;
+            max-width: 1200px;
             display: flex;
             flex-direction: column;
             gap: 14px;
+        }
+
+        .main-game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+        }
+        
+        .layout-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            width: 100%;
+        }
+
+        @media (min-width: 900px) {
+            .layout-wrapper {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+            .main-game-area {
+                width: 70%;
+            }
+            .sidebar {
+                width: 30%;
+                min-width: 300px;
+            }
         }
 
         .lobby-card {
@@ -226,19 +254,20 @@
 
         .players-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
         }
 
         .player-card {
             background: rgba(30, 41, 59, 0.92);
             border: 2px solid #334155;
             border-radius: 12px;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
             position: relative;
             cursor: pointer;
             transition: 0.2s;
+            font-size: 13px;
         }
         
         .player-card.empty-seat {
@@ -271,31 +300,31 @@
         }
 
         .avatar {
-            font-size: 32px;
+            font-size: 28px;
             margin-bottom: 4px;
         }
 
         .p-name {
             font-weight: bold;
-            font-size: 15px;
+            font-size: 14px;
             word-break: break-word;
         }
 
         .p-status {
-            font-size: 12px;
+            font-size: 11px;
             color: #94a3b8;
             margin-top: 4px;
         }
 
         .vote-badge {
             position: absolute;
-            top: 8px;
-            right: 8px;
+            top: 4px;
+            right: 4px;
             background: #ef4444;
             color: #fff;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
-            padding: 2px 8px;
+            padding: 2px 6px;
             border-radius: 12px;
         }
 
@@ -340,7 +369,7 @@
         }
 
         #action-prompt {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             color: #fde047;
             margin-bottom: 10px;
@@ -352,18 +381,26 @@
             gap: 10px;
             flex-wrap: wrap;
         }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+        }
 
         .chat-box {
             background: rgba(15, 23, 42, 0.94);
             border: 1px solid #334155;
             border-radius: 12px;
-            height: 230px;
+            height: 400px;
             overflow-y: auto;
             padding: 12px;
             display: flex;
             flex-direction: column;
             gap: 7px;
-            font-size: 14px;
+            font-size: 13px;
+            flex: 1;
         }
 
         .log-item {
@@ -474,19 +511,26 @@
             <button class="btn btn-success" style="padding: 6px 12px; font-size: 14px;" onclick="changeMaxPlayers()">Cập nhật</button>
         </div>
 
-        <div class="players-grid" id="players-grid"></div>
+        <div class="layout-wrapper">
+            <div class="main-game-area">
+                <div class="players-grid" id="players-grid"></div>
 
-        <div class="action-panel">
-            <div id="phase-timer-box">⏳ <span id="timer-label">Thời gian còn lại</span>: <span id="phase-timer">30</span>s</div>
-            <div id="action-prompt">Đang chờ chủ phòng bắt đầu...</div>
-            <div class="action-buttons" id="action-buttons"></div>
-        </div>
+                <div class="action-panel">
+                    <div id="phase-timer-box">⏳ <span id="timer-label">Thời gian còn lại</span>: <span id="phase-timer">45</span>s</div>
+                    <div id="action-prompt">Đang chờ chủ phòng bắt đầu...</div>
+                    <div class="action-buttons" id="action-buttons"></div>
+                </div>
+            </div>
 
-        <div class="chat-box" id="chat-box"></div>
-        <div class="chat-input-row">
-            <input type="text" id="chat-input" placeholder="Nhập tin nhắn..."
-                onkeydown="if(event.key==='Enter') sendChat()">
-            <button class="btn btn-primary" onclick="sendChat()">Gửi</button>
+            <div class="sidebar">
+                <div class="chat-input-row">
+                    <input type="text" id="chat-input" placeholder="Nhập tin nhắn..."
+                        onkeydown="if(event.key==='Enter') sendChat()">
+                    <button class="btn btn-primary" onclick="sendChat()">Gửi</button>
+                </div>
+                <div class="chat-box" id="chat-box"></div>
+            </div>
+
         </div>
     </div>
 
@@ -590,7 +634,7 @@
         let isResolvingPhase = false; 
         let renderedChatKeys = new Set(); 
         let selectedTargets = [];
-        let state = { maxPlayers: 8, phase: 'LOBBY', dayCount: 1, players: [], lastGuardedId: null, hunterId: null, lovers: [], phaseTimer: 30 };
+        let state = { maxPlayers: 8, phase: 'LOBBY', dayCount: 1, players: [], lastGuardedId: null, hunterId: null, lovers: [], phaseTimer: 45 };
 
         function getPlayerName() {
             const val = document.getElementById('player-name-input').value.trim();
@@ -617,7 +661,24 @@
                 enterGameScreen();
                 broadcastLog(`👑 Bạn đã tạo phòng <b>${roomCode}</b> (${state.maxPlayers} người). Hãy gửi mã cho bạn bè!`, 'system');
                 setupHostListeners();
-                roomRef.onDisconnect().remove();
+                
+                // Cập nhật onDisconnect để tự chết khi thoát
+                roomRef.child('players').on('value', snap => {
+                    if(snap.exists()) {
+                        let players = snap.val();
+                        let myIndex = players.findIndex(p => p.id === myId);
+                        if (myIndex !== -1) {
+                            roomRef.child('players/' + myIndex + '/alive').onDisconnect().set(false);
+                            // Thông báo tự động chết khi mất kết nối
+                            const disconnectMsg = `🔌 <b>${myName}</b> đã ngắt kết nối và tự vẫn!`;
+                            roomRef.child('disconnectLogs').onDisconnect().set({
+                                msg: disconnectMsg,
+                                time: firebase.database.ServerValue.TIMESTAMP
+                            });
+                        }
+                    }
+                });
+                
             });
         }
 
@@ -641,6 +702,23 @@
 
                 db.ref('rooms/' + roomCode + '/joinRequests').push({ id: myId, name: myName });
                 enterGameScreen();
+                
+                // Thiết lập ngắt kết nối cho người tham gia
+                const roomRef = db.ref('rooms/' + roomCode);
+                roomRef.child('state/players').on('value', playersSnap => {
+                    if(playersSnap.exists()) {
+                        let players = playersSnap.val();
+                        let myIndex = players.findIndex(p => p.id === myId);
+                        if (myIndex !== -1) {
+                            roomRef.child('state/players/' + myIndex + '/alive').onDisconnect().set(false);
+                            const disconnectMsg = `🔌 <b>${myName}</b> đã ngắt kết nối và tự vẫn!`;
+                            roomRef.child('disconnectLogs').onDisconnect().set({
+                                msg: disconnectMsg,
+                                time: firebase.database.ServerValue.TIMESTAMP
+                            });
+                        }
+                    }
+                });
             });
         }
 
@@ -708,6 +786,26 @@
             db.ref('rooms/' + roomCode + '/hunterShots').on('child_added', snap => {
                 const data = snap.val(); processHunterShot(data.playerId, data.targetId); snap.ref.remove();
             });
+            
+            // Xử lý khi có ai đó ngắt kết nối
+            db.ref('rooms/' + roomCode + '/disconnectLogs').on('value', snap => {
+                if(snap.exists()) {
+                    let data = snap.val();
+                    broadcastLog(data.msg, 'death');
+                    
+                    // Xóa log để lần sau còn trigger
+                    db.ref('rooms/' + roomCode + '/disconnectLogs').remove();
+                    
+                    // Kiểm tra win condition nếu có người chết
+                    if(state.phase !== 'LOBBY' && state.phase !== 'GAMEOVER') {
+                         setTimeout(() => {
+                            if (checkWinCondition()) {
+                                // Game kết thúc thì các logic khác sẽ được clear
+                            }
+                         }, 1000);
+                    }
+                }
+            });
         }
 
         function setupClientListeners() {
@@ -755,8 +853,11 @@
 
         function addLogUI(text, logType = '') {
             const box = document.getElementById('chat-box');
-            box.innerHTML += `<div class="log-item ${logType ? 'log-' + logType : ''}">${text}</div>`;
-            box.scrollTop = box.scrollHeight;
+            const newItem = document.createElement('div');
+            newItem.className = `log-item ${logType ? 'log-' + logType : ''}`;
+            newItem.innerHTML = text;
+            box.insertBefore(newItem, box.firstChild);
+            
             if (logType === 'death') playSFX('DEATH'); else if (!logType) playSFX('CHAT');
         }
 
@@ -778,7 +879,6 @@
             clearInterval(phaseInterval);
             isResolvingPhase = false;
             
-            // Xóa chat cũ khi trở về sảnh chờ thay vì lúc vào game
             renderedChatKeys.clear();
             document.getElementById('chat-box').innerHTML = '';
             db.ref('rooms/' + roomCode + '/chat').remove();
@@ -789,7 +889,6 @@
             state.hunterId = null;
             state.lovers = [];
             
-            // Reset trạng thái người chơi, giữ lại danh sách và avatar
             state.players.forEach(p => {
                 p.role = null;
                 p.alive = true;
@@ -854,7 +953,7 @@
             isResolvingPhase = false;
 
             state.phase = 'NIGHT';
-            state.phaseTimer = 30;
+            state.phaseTimer = 45;
             selectedTargets = [];
 
             let humanHasSkill = false;
@@ -865,7 +964,7 @@
                 if (!p.nightActionDone) humanHasSkill = true;
             });
 
-            broadcastLog(`🌙 <b>ĐÊM THỨ ${state.dayCount}</b> buông xuống... (30 giây hành động)`, 'system');
+            broadcastLog(`🌙 <b>ĐÊM THỨ ${state.dayCount}</b> buông xuống... (45 giây hành động)`, 'system');
             broadcastState();
 
             if (!humanHasSkill) {
@@ -883,7 +982,7 @@
 
                 if (state.phaseTimer <= 0) {
                     clearInterval(phaseInterval);
-                    broadcastLog(`⏰ <b>HẾT 30 GIÂY BAN ĐÊM!</b> Trời bắt đầu sáng...`, 'system');
+                    broadcastLog(`⏰ <b>HẾT 45 GIÂY BAN ĐÊM!</b> Trời bắt đầu sáng...`, 'system');
                     resolveNight();
                 }
             }, 1000);
@@ -944,6 +1043,7 @@
             const primaryDead = state.players.find(p => p.id === deadPlayerId);
             if (primaryDead && primaryDead.alive) {
                 primaryDead.alive = false; deadList.push(primaryDead);
+                // Đã chỉnh sửa để KHÔNG hiện vai trò khi chết
                 broadcastLog(reasonMsg, 'death');
 
                 if (state.lovers && state.lovers.includes(deadPlayerId)) {
@@ -951,7 +1051,7 @@
                     const lover = state.players.find(p => p.id === loverId);
                     if (lover && lover.alive) {
                         lover.alive = false; deadList.push(lover);
-                        setTimeout(() => { broadcastLog(`💔 <b>${lover.name}</b> đau đớn tột cùng và tự vẫn theo người tình! (${lover.role.name})`, 'death'); broadcastState(); }, 1000);
+                        setTimeout(() => { broadcastLog(`💔 <b>${lover.name}</b> đau đớn tột cùng và tự vẫn theo người tình!`, 'death'); broadcastState(); }, 1000);
                     }
                 }
             }
@@ -1031,11 +1131,11 @@
             isResolvingPhase = false;
 
             state.phase = 'DAY_VOTE';
-            state.phaseTimer = 15;
+            state.phaseTimer = 30;
             selectedTargets = [];
             state.players.forEach(p => { p.votes = 0; p.voted = (!p.alive || p.isAI); });
 
-            broadcastLog(`🗳️ <b>BẮT ĐẦU BỎ PHIẾU TREO CỔ! (Bạn có 15 giây)</b>`, 'system');
+            broadcastLog(`🗳️ <b>BẮT ĐẦU BỎ PHIẾU TREO CỔ! (Bạn có 30 giây)</b>`, 'system');
             broadcastState();
 
             phaseInterval = setInterval(() => {
@@ -1048,7 +1148,7 @@
 
                 if (state.phaseTimer <= 0) {
                     clearInterval(phaseInterval);
-                    broadcastLog(`⏰ <b>HẾT 15 GIÂY!</b> Những ai chưa vote tính là bỏ phiếu trắng.`, 'system');
+                    broadcastLog(`⏰ <b>HẾT 30 GIÂY!</b> Những ai chưa vote tính là bỏ phiếu trắng.`, 'system');
                     state.players.forEach(p => {
                         if (p.alive && !p.isAI && !p.voted) p.voted = true;
                     });
@@ -1109,7 +1209,8 @@
 
             if (alive[0] && alive[0].votes > 0 && alive[0].votes > (alive[1]?.votes || 0)) {
                 const executed = alive[0];
-                const deadList = killPlayerAndCheckLover(executed.id, `⚖️ Dân làng treo cổ <b>${executed.name}</b> (${executed.votes} phiếu)! Vai trò thật: <b>${executed.role.name}</b>.`);
+                // Đã chỉnh sửa để KHÔNG hiện vai trò thật khi bị treo cổ
+                const deadList = killPlayerAndCheckLover(executed.id, `⚖️ Dân làng treo cổ <b>${executed.name}</b> (${executed.votes} phiếu)! Danh tính của họ bị giấu kín.`);
                 const deadHunter = deadList.find(p => p.role.id === 'HUNTER');
                 if (deadHunter) hunterNeedsToShoot = deadHunter;
             } else broadcastLog(`⚖️ Phiếu hòa nhau hoặc không ai vote! Không ai bị treo cổ hôm nay.`, 'system');
@@ -1127,7 +1228,8 @@
                 const targets = state.players.filter(p => p.alive && p.id !== hunter.id);
                 if (targets.length > 0) {
                     const shot = targets[Math.floor(Math.random() * targets.length)];
-                    killPlayerAndCheckLover(shot.id, `🏹 Thợ Săn <b>${hunter.name}</b> hấp hối đã bắn hạ <b>${shot.name}</b> (${shot.role.name})!`);
+                    // Đã chỉnh sửa để KHÔNG hiện vai trò của người bị bắn
+                    killPlayerAndCheckLover(shot.id, `🏹 Thợ Săn <b>${hunter.name}</b> hấp hối đã bắn hạ <b>${shot.name}</b>!`);
                 }
                 setTimeout(() => {
                     if (!checkWinCondition()) {
@@ -1151,7 +1253,8 @@
             if (playerId !== state.hunterId || state.phase !== 'HUNTER_SHOT') return;
             state.phase = 'HUNTER_DONE';
             const target = state.players.find(p => p.id === targetId);
-            if (target && target.alive) killPlayerAndCheckLover(target.id, `🏹 Thợ Săn nổ súng bắn chết <b>${target.name}</b> (${target.role.name})!`);
+            // Đã chỉnh sửa để KHÔNG hiện vai trò của người bị bắn
+            if (target && target.alive) killPlayerAndCheckLover(target.id, `🏹 Thợ Săn nổ súng bắn chết <b>${target.name}</b>!`);
 
             broadcastState();
             setTimeout(() => {
@@ -1233,11 +1336,11 @@
             if (state.phase === 'NIGHT') {
                 timerBox.style.display = 'block';
                 timerLabel.innerText = 'Thời gian hành động đêm';
-                timerText.innerText = state.phaseTimer !== undefined ? state.phaseTimer : 30;
+                timerText.innerText = state.phaseTimer !== undefined ? state.phaseTimer : 45;
             } else if (state.phase === 'DAY_VOTE') {
                 timerBox.style.display = 'block';
                 timerLabel.innerText = 'Thời gian bình chọn';
-                timerText.innerText = state.phaseTimer !== undefined ? state.phaseTimer : 15;
+                timerText.innerText = state.phaseTimer !== undefined ? state.phaseTimer : 30;
             } else {
                 timerBox.style.display = 'none';
             }
@@ -1246,9 +1349,14 @@
             
             state.players.forEach(p => {
                 const isMe = p.id === myId;
-                const showRole = (state.phase === 'GAMEOVER') || !p.alive || isMe || (me.role?.id === 'WOLF' && p.role?.id === 'WOLF');
+                // Đã chỉnh sửa logic showRole để KHÔNG hiện vai trò của người khác khi họ chết. Chỉ hiện khi GAMEOVER, của chính mình, hoặc Sói thấy Sói.
+                const showRole = (state.phase === 'GAMEOVER') || isMe || (me.role?.id === 'WOLF' && p.role?.id === 'WOLF');
                 let statusText = 'Đang chờ...';
-                if (state.phase !== 'LOBBY') statusText = p.alive ? (showRole && p.role ? p.role.name : '❓ Ẩn danh') : `Đã chết (${p.role.name})`;
+                if (state.phase !== 'LOBBY') {
+                     statusText = p.alive 
+                        ? (showRole && p.role ? p.role.name : '❓ Ẩn danh') 
+                        : `Đã chết ${showRole && p.role ? '(' + p.role.name + ')' : '(❓ Ẩn danh)'}`;
+                }
 
                 const isSelected = selectedTargets.includes(p.id);
                 const loverBadge = (state.lovers.includes(myId) && state.lovers.includes(p.id) && me.alive) ? `<div style="position:absolute; top:8px; left:8px; font-size:16px;">💘</div>` : "";
@@ -1317,7 +1425,7 @@
                 if (!me.alive) promptEl.innerText = "Đang chờ người sống bỏ phiếu...";
                 else if (me.voted) promptEl.innerText = "✅ Bạn đã bỏ phiếu. Đang chờ những người còn lại...";
                 else {
-                    promptEl.innerText = "🗳️ Thảo luận nhanh & chọn 1 người để treo cổ trong 15 giây:";
+                    promptEl.innerText = "🗳️ Thảo luận nhanh & chọn 1 người để treo cổ trong 30 giây:";
                     btnsEl.innerHTML = `<button class="btn" onclick="submitVote(false)">🗳️ Vote người đã chọn</button> <button class="btn btn-primary" onclick="submitVote(true)">⏭️ Bỏ phiếu trắng</button>`;
                 }
             } else if (state.phase === 'HUNTER_SHOT') {
