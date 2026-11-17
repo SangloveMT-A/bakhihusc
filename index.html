@@ -873,6 +873,7 @@
             db.ref('rooms/' + roomCode + '/chat').remove();
 
             state.phase = 'LOBBY';
+            state.winner = null;
             state.dayCount = 1;
             state.lastGuardedId = null;
             state.hunterId = null;
@@ -1259,11 +1260,19 @@
             const villagers = state.players.filter(p => p.alive && p.role.id !== 'WOLF').length;
             if (wolves === 0) {
                 clearInterval(phaseInterval);
-                state.phase = 'GAMEOVER'; broadcastLog(`🎉 <b>DÂN LÀNG THẮNG!</b> Đã diệt sạch Ma Sói.`, 'seer'); broadcastState(); return true;
+                state.phase = 'GAMEOVER'; 
+                state.winner = 'VILLAGER';
+                broadcastLog(`🎉 <b>DÂN LÀNG THẮNG!</b> Đã diệt sạch Ma Sói.`, 'seer'); 
+                broadcastState(); 
+                return true;
             }
             if (wolves >= villagers) {
                 clearInterval(phaseInterval);
-                state.phase = 'GAMEOVER'; broadcastLog(`🐺 <b>MA SÓI THẮNG!</b> Số Sói đã áp đảo Dân Làng.`, 'death'); broadcastState(); return true;
+                state.phase = 'GAMEOVER'; 
+                state.winner = 'WOLF';
+                broadcastLog(`🐺 <b>MA SÓI THẮNG!</b> Số Sói đã áp đảo Dân Làng.`, 'death'); 
+                broadcastState(); 
+                return true;
             }
             return false;
         }
@@ -1423,8 +1432,20 @@
                     btnsEl.innerHTML = `<button class="btn" onclick="submitHunterShot()">💥 Bắn mục tiêu</button>`;
                 } else promptEl.innerText = "🏹 Thợ Săn đang nhắm bắn...";
             } else if (state.phase === 'GAMEOVER') {
-                promptEl.innerText = "🏁 Ván chơi kết thúc!";
-                if (isHost) btnsEl.innerHTML = `<button class="btn btn-success" onclick="returnToLobby()">🔙 Về Sảnh Chờ</button>`;
+                let winText = "🏁 Ván chơi kết thúc!";
+                let winImage = "";
+
+                if (state.winner === 'WOLF') {
+                    winText = "🐺 PHE SÓI THẮNG!";
+                    winImage = `<img src="./soithang.jpg" style="width:100%; max-width:250px; border-radius:12px; margin-top:12px; border: 3px solid #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);">`;
+                } else if (state.winner === 'VILLAGER') {
+                    winText = "🎉 PHE DÂN THẮNG!";
+                    winImage = `<img src="./nguoithang.jpg" style="width:100%; max-width:250px; border-radius:12px; margin-top:12px; border: 3px solid #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);">`;
+                }
+
+                promptEl.innerHTML = `<div style="font-size: 22px; font-weight: 900; color: #fde047; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">${winText}</div>${winImage}`;
+                
+                if (isHost) btnsEl.innerHTML = `<br><button class="btn btn-success" onclick="returnToLobby()" style="margin-top: 15px;">🔙 Về Sảnh Chờ</button>`;
             }
         }
     </script>
