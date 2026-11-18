@@ -295,6 +295,13 @@
             cursor: not-allowed;
         }
 
+        
+        .player-card.wolf-teammate {
+            border-color: #ef4444;
+            background: rgba(127, 29, 29, 0.25);
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+        }
+
         .player-card.is-me {
             border-color: #38bdf8;
         }
@@ -986,6 +993,13 @@
                 if (selectedTargets.length !== 2) { alert("Thiên sứ tình yêu cần chọn đúng 2 người!"); return; }
             } else {
                 if (selectedTargets.length === 0) { alert("Hãy chọn 1 người chơi!"); return; }
+                
+                const targetPlayer = state.players.find(p => p.id === selectedTargets[0]);
+                if (me.role.id === 'WOLF' && targetPlayer && targetPlayer.role && targetPlayer.role.id === 'WOLF') {
+                    alert("Sói không thể cắn đồng loại!");
+                    return;
+                }
+                
                 if (me.role.id === 'SEER' && selectedTargets[0] === myId) { alert("Không thể tự soi chính mình!"); return; }
                 if (me.role.id === 'GUARD' && selectedTargets[0] === state.lastGuardedId) { alert("Không bảo vệ 1 người 2 đêm liên tiếp!"); return; }
             }
@@ -1363,13 +1377,14 @@
                     ? `<div><button class="kick-btn" onclick="kickPlayer(event, '${p.id}')">👢 Kích</button></div>` 
                     : '';
 
+                const isWolfTeammate = (me.role?.id === 'WOLF' && p.role?.id === 'WOLF' && !isMe);
                 const card = document.createElement('div');
-                card.className = `player-card ${p.alive ? '' : 'dead'} ${isMe ? 'is-me' : ''} ${isSelected ? 'selected' : ''}`;
+                card.className = `player-card ${p.alive ? '' : 'dead'} ${isMe ? 'is-me' : ''} ${isSelected ? 'selected' : ''} ${isWolfTeammate ? 'wolf-teammate' : ''}`;
                 card.innerHTML = `
                     ${loverBadge} ${p.votes > 0 ? `<div class="vote-badge">${p.votes} phiếu</div>` : ''}
                     <div class="avatar">${p.alive ? p.avatar : '🪦'}</div>
-                    <div class="p-name">${p.name} ${isMe ? '(Bạn)' : ''}</div>
-                    <div class="p-status">${statusText}</div>
+                    <div class="p-name" style="${isWolfTeammate ? 'color: #fca5a5;' : ''}">${p.name} ${isMe ? '(Bạn)' : ''} ${isWolfTeammate ? '🐺' : ''}</div>
+                    <div class="p-status" style="${isWolfTeammate ? 'color: #ef4444; font-weight: bold;' : ''}">${statusText}</div>
                     ${kickButtonHTML}
                 `;
 
